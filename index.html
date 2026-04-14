@@ -1,259 +1,552 @@
 
 <style>
-  #csv-wrap { padding: 1rem 0; font-size: 14px; }
-  #drop-zone {
-    border: 1.5px dashed var(--color-border-secondary);
-    border-radius: var(--border-radius-lg);
-    padding: 2rem;
-    text-align: center;
-    background: var(--color-background-secondary);
-    cursor: pointer;
-    transition: border-color 0.15s;
-  }
-  #drop-zone.drag-over { border-color: #378ADD; background: var(--color-background-primary); }
-  #drop-zone p { margin: 0.4rem 0; color: var(--color-text-secondary); font-size: 13px; }
-  #drop-zone strong { color: var(--color-text-primary); font-size: 15px; }
-  #csv-input { width: 100%; height: 120px; margin-top: 1rem; font-family: var(--font-mono); font-size: 12px;
-    border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md);
-    padding: 10px; background: var(--color-background-primary); color: var(--color-text-primary); resize: vertical; }
-  #controls { display: flex; align-items: center; gap: 10px; margin: 0.75rem 0; flex-wrap: wrap; }
-  #search { flex: 1; min-width: 160px; }
-  #stats { font-size: 12px; color: var(--color-text-secondary); margin-left: auto; white-space: nowrap; }
-  #table-wrap { overflow-x: auto; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  thead { position: sticky; top: 0; z-index: 1; }
-  th {
-    background: var(--color-background-secondary);
-    padding: 9px 12px; text-align: left; font-weight: 500;
-    border-bottom: 0.5px solid var(--color-border-tertiary);
-    white-space: nowrap; cursor: pointer; user-select: none;
-    color: var(--color-text-secondary);
-  }
-  th:hover { color: var(--color-text-primary); }
-  th .sort-icon { font-size: 10px; margin-left: 4px; opacity: 0.5; }
-  th.asc .sort-icon::after { content: '▲'; opacity: 1; }
-  th.desc .sort-icon::after { content: '▼'; opacity: 1; }
-  th:not(.asc):not(.desc) .sort-icon::after { content: '⬍'; }
-  td { padding: 8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); color: var(--color-text-primary); }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: var(--color-background-secondary); }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--color-text-secondary); }
-  #pagination { display: flex; align-items: center; gap: 8px; margin-top: 0.75rem; font-size: 13px; flex-wrap: wrap; }
-  #pagination button { padding: 4px 10px; }
-  #page-info { color: var(--color-text-secondary); font-size: 12px; }
-  .empty-msg { text-align: center; padding: 2rem; color: var(--color-text-secondary); }
-  #delimiter-select { font-size: 13px; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body, :root { font-family: 'Malgun Gothic', 'Noto Sans KR', 'Apple SD Gothic Neo', var(--font-sans), sans-serif; }
+#app { background: var(--color-background-primary); }
+#ribbon {
+  background: #1d6f42;
+  padding: 6px 10px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+#ribbon .title { color: #fff; font-size: 13px; font-weight: 500; margin-right: 6px; letter-spacing: 0.02em; }
+#ribbon button {
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; padding: 4px 10px; border-radius: 3px; font-size: 12px; cursor: pointer;
+  font-family: inherit;
+}
+#ribbon button:hover { background: rgba(255,255,255,0.28); }
+#ribbon button:disabled { opacity: 0.4; cursor: default; }
+#ribbon .sep { width: 1px; height: 18px; background: rgba(255,255,255,0.3); margin: 0 2px; }
+#ribbon select {
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; padding: 4px 6px; border-radius: 3px; font-size: 12px; font-family: inherit;
+}
+#ribbon select option { background: #1d6f42; color: #fff; }
+#formula-bar {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1px solid #c6c6c6; background: var(--color-background-primary);
+}
+#cell-ref {
+  width: 72px; min-width: 72px; padding: 4px 8px; font-size: 12px;
+  border-right: 1px solid #c6c6c6; color: var(--color-text-secondary);
+  font-family: inherit; background: #f2f2f2; text-align: center;
+}
+#formula-input {
+  flex: 1; padding: 4px 10px; font-size: 13px; border: none; outline: none;
+  background: var(--color-background-primary); color: var(--color-text-primary);
+  font-family: inherit;
+}
+#statusbar {
+  background: #217346; color: #fff; padding: 3px 10px;
+  font-size: 11px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+}
+#statusbar span { opacity: 0.9; }
+#grid-container {
+  overflow: auto; max-height: 480px;
+  border-left: 1px solid #c6c6c6; border-right: 1px solid #c6c6c6;
+}
+table#grid {
+  border-collapse: collapse; table-layout: fixed;
+  font-size: 13px; font-family: inherit;
+}
+table#grid thead tr th {
+  background: #f2f2f2; border: 1px solid #d0d0d0;
+  padding: 3px 6px; font-weight: 500; color: #444;
+  white-space: nowrap; user-select: none; cursor: pointer;
+  min-width: 80px; max-width: 200px; position: sticky; top: 0; z-index: 2;
+  font-size: 12px;
+}
+table#grid thead tr th.row-num-head {
+  min-width: 36px; width: 36px; cursor: default;
+  background: #f2f2f2; position: sticky; left: 0; z-index: 3;
+}
+table#grid thead tr th.sorted-asc::after { content: ' ▲'; font-size: 9px; }
+table#grid thead tr th.sorted-desc::after { content: ' ▼'; font-size: 9px; }
+table#grid thead tr th:hover:not(.row-num-head) { background: #dce9f5; }
+table#grid tbody tr td {
+  border: 1px solid #d0d0d0; padding: 2px 6px;
+  color: var(--color-text-primary); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  max-width: 200px; min-width: 80px;
+  height: 22px; line-height: 18px;
+}
+table#grid tbody tr td.row-num {
+  background: #f2f2f2; color: #888; text-align: center;
+  font-size: 11px; min-width: 36px; width: 36px;
+  position: sticky; left: 0; z-index: 1; border-color: #d0d0d0;
+}
+table#grid tbody tr:nth-child(even) td:not(.row-num) { background: #f9fbf9; }
+table#grid tbody tr:nth-child(odd) td:not(.row-num) { background: #fff; }
+table#grid tbody tr:hover td:not(.row-num) { background: #e8f4fd !important; }
+table#grid tbody tr td.selected {
+  background: #cce0ff !important; outline: 2px solid #1565c0; outline-offset: -2px;
+}
+table#grid tbody tr td.num-cell { text-align: right; color: #0b5394; }
+table#grid tbody tr td.edit-cell {
+  padding: 0; overflow: visible;
+}
+table#grid tbody tr td.edit-cell input {
+  width: 100%; height: 100%; padding: 2px 5px; border: none; outline: none;
+  font-size: 13px; font-family: inherit; background: #fff;
+  color: var(--color-text-primary);
+}
+#drop-zone {
+  border: 2px dashed #c6c6c6; border-radius: 4px;
+  padding: 28px 20px; text-align: center; cursor: pointer; margin: 1rem;
+  background: #f9fbf9;
+}
+#drop-zone.drag-over { border-color: #1d6f42; background: #e8f5e9; }
+#drop-zone p { color: #666; font-size: 13px; margin: 4px 0; }
+#drop-zone strong { color: #1d6f42; font-size: 15px; }
+#paste-area {
+  margin: 0 1rem 1rem; display: flex; gap: 8px; align-items: flex-start;
+}
+#csv-paste {
+  flex: 1; height: 80px; font-size: 12px; font-family: monospace;
+  border: 1px solid #c6c6c6; border-radius: 3px; padding: 8px; resize: vertical;
+  background: var(--color-background-primary); color: var(--color-text-primary);
+}
+#paste-controls { display: flex; flex-direction: column; gap: 6px; }
+#paste-controls button, #paste-controls select {
+  font-size: 12px; padding: 5px 10px; border-radius: 3px; font-family: inherit;
+  border: 1px solid #c6c6c6; cursor: pointer;
+  background: var(--color-background-primary); color: var(--color-text-primary);
+}
+.changed-cell { background: #fffbe6 !important; }
+#edit-toolbar {
+  display: none; background: #f2f2f2; border-bottom: 1px solid #c6c6c6;
+  padding: 4px 10px; gap: 6px; align-items: center; flex-wrap: wrap;
+}
+#edit-toolbar button, #edit-toolbar select {
+  font-size: 12px; padding: 3px 8px; font-family: inherit;
+  border: 1px solid #c6c6c6; border-radius: 3px; cursor: pointer;
+  background: var(--color-background-primary); color: var(--color-text-primary);
+}
+#edit-toolbar .lbl { font-size: 11px; color: #666; }
+#search-bar { display: none; background: #fff3cd; border-bottom: 1px solid #ffc107; padding: 5px 10px; gap: 8px; align-items: center; }
+#search-bar input { font-size: 13px; padding: 3px 8px; border: 1px solid #c6c6c6; border-radius: 3px; font-family: inherit; flex:1; min-width:140px; }
 </style>
 
-<div id="csv-wrap">
-  <h2 class="sr-only">CSV file viewer — paste or upload CSV data to explore it as a table</h2>
+<div id="app">
+  <h2 class="sr-only">Excel-style CSV editor with multilingual support — upload or paste CSV to view and edit</h2>
 
-  <div id="drop-zone" onclick="document.getElementById('file-input').click()" ondragover="handleDrag(event,true)" ondragleave="handleDrag(event,false)" ondrop="handleDrop(event)">
-    <strong>Drop a CSV file here</strong>
-    <p>or click to browse — or paste data below</p>
-    <input type="file" id="file-input" accept=".csv,.tsv,.txt" style="display:none" onchange="handleFile(event)">
-  </div>
-
-  <textarea id="csv-input" placeholder="…or paste CSV text here and click Parse"></textarea>
-
-  <div style="display:flex;gap:8px;margin:0.5rem 0;align-items:center;">
-    <label style="font-size:13px;color:var(--color-text-secondary);">Delimiter:</label>
-    <select id="delimiter-select">
-      <option value="auto">Auto-detect</option>
-      <option value=",">Comma (,)</option>
-      <option value="	">Tab (\t)</option>
-      <option value=";">Semicolon (;)</option>
-      <option value="|">Pipe (|)</option>
+  <div id="ribbon">
+    <span class="title">CSV Editor</span>
+    <div class="sep"></div>
+    <button onclick="document.getElementById('file-in').click()">Open file</button>
+    <input type="file" id="file-in" accept=".csv,.tsv,.txt" style="display:none" onchange="handleFile(event)">
+    <button id="btn-save" onclick="downloadCSV()" disabled>Export CSV</button>
+    <div class="sep"></div>
+    <button id="btn-edit" onclick="toggleEditMode()" disabled>Edit mode</button>
+    <button id="btn-addrow" onclick="addRow()" style="display:none">+ Row</button>
+    <button id="btn-addcol" onclick="addCol()" style="display:none">+ Column</button>
+    <button id="btn-delrow" onclick="delRow()" style="display:none">- Row</button>
+    <button id="btn-undo" onclick="undo()" style="display:none" disabled>Undo</button>
+    <div class="sep"></div>
+    <button id="btn-search" onclick="toggleSearch()" disabled>Find</button>
+    <div class="sep"></div>
+    <label style="color:#fff;font-size:12px;">Delimiter:</label>
+    <select id="delim-sel">
+      <option value="auto">Auto</option>
+      <option value=",">,</option>
+      <option value="	">Tab</option>
+      <option value=";">;</option>
+      <option value="|">|</option>
     </select>
-    <button onclick="parseInput()" style="margin-left:auto;">Parse ↗</button>
-    <button id="clear-btn" onclick="clearAll()" style="display:none;">Clear</button>
-    <button id="copy-btn" onclick="copyFiltered()" style="display:none;">Copy filtered</button>
-  </div>
-
-  <div id="controls" style="display:none;">
-    <input type="search" id="search" placeholder="Search all columns…" oninput="applyFilters()">
-    <label style="font-size:13px;color:var(--color-text-secondary);">Rows/page:</label>
-    <select id="page-size" onchange="applyFilters()">
-      <option value="20">20</option>
-      <option value="50">50</option>
-      <option value="100">100</option>
-      <option value="all">All</option>
+    <label style="color:#fff;font-size:12px;margin-left:4px;">Encoding:</label>
+    <select id="enc-sel">
+      <option value="UTF-8">UTF-8</option>
+      <option value="EUC-KR">EUC-KR</option>
+      <option value="UTF-16">UTF-16</option>
     </select>
-    <span id="stats"></span>
   </div>
 
-  <div id="table-wrap" style="display:none;max-height:480px;overflow-y:auto;"></div>
-  <div id="pagination" style="display:none;"></div>
+  <div id="search-bar">
+    <input type="search" id="search-input" placeholder="Search…" oninput="doSearch()">
+    <span id="search-hits" style="font-size:12px;color:#666;"></span>
+    <button onclick="toggleSearch()" style="font-size:12px;padding:2px 8px;border:1px solid #ccc;border-radius:3px;cursor:pointer;">Close</button>
+  </div>
+
+  <div id="formula-bar">
+    <div id="cell-ref">—</div>
+    <input id="formula-input" placeholder="Select a cell to edit" readonly>
+  </div>
+
+  <div id="edit-toolbar">
+    <span class="lbl">Row color:</span>
+    <input type="color" id="row-color" value="#fff9c4" title="Highlight selected row" onchange="colorRow()">
+    <button onclick="clearRowColor()">Clear highlight</button>
+    <div style="flex:1"></div>
+    <span id="edit-hint" style="font-size:11px;color:#888;">Double-click or F2 to edit a cell</span>
+  </div>
+
+  <div id="grid-container">
+    <div id="drop-zone" onclick="document.getElementById('file-in').click()" ondragover="handleDrag(event,true)" ondragleave="handleDrag(event,false)" ondrop="handleDrop(event)">
+      <strong>Drop a CSV file here</strong>
+      <p>Supports UTF-8, EUC-KR, Korean, Japanese, Chinese, Arabic…</p>
+      <p>or paste CSV text below and click Parse</p>
+    </div>
+    <div id="paste-area">
+      <textarea id="csv-paste" placeholder="Paste CSV text here…"></textarea>
+      <div id="paste-controls">
+        <button onclick="parsePaste()">Parse</button>
+        <button onclick="clearAll()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="statusbar">
+    <span id="st-rows">No data</span>
+    <span id="st-cols"></span>
+    <span id="st-cell"></span>
+    <span id="st-sum"></span>
+    <span id="st-changes" style="margin-left:auto;"></span>
+  </div>
 </div>
 
 <script>
-let allRows = [], headers = [], sortCol = -1, sortDir = 1, currentPage = 1, filteredRows = [];
+let headers = [], rows = [], sortCol = -1, sortDir = 1;
+let editMode = false, selRow = -1, selCol = -1;
+let undoStack = [], changes = 0;
+let rowColors = {}, searchActive = false;
+let numericCols = [];
 
-function detectDelimiter(text) {
+function colLetter(i) {
+  let s = '';
+  i++;
+  while (i > 0) { s = String.fromCharCode(64 + (i % 26 || 26)) + s; i = Math.floor((i - 1) / 26); }
+  return s;
+}
+
+function detectDelim(text) {
   const line = text.split('\n')[0];
-  const counts = {',': 0, '\t': 0, ';': 0, '|': 0};
-  let inQ = false;
-  for (const ch of line) {
-    if (ch === '"') inQ = !inQ;
-    if (!inQ && counts[ch] !== undefined) counts[ch]++;
-  }
-  return Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+  const c = {',': 0, '\t': 0, ';': 0, '|': 0};
+  let q = false;
+  for (const ch of line) { if (ch === '"') q = !q; else if (!q && c[ch] !== undefined) c[ch]++; }
+  return Object.entries(c).sort((a, b) => b[1] - a[1])[0][0];
 }
 
 function parseCSV(text, delim) {
-  const rows = [], lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  const result = [], lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   for (const line of lines) {
     if (!line.trim()) continue;
-    const cells = [], d = delim;
-    let cur = '', inQ = false;
+    const cells = []; let cur = '', inQ = false;
     for (let i = 0; i < line.length; i++) {
       const ch = line[i];
-      if (ch === '"') {
-        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
-      } else if (ch === d && !inQ) { cells.push(cur); cur = ''; }
+      if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if (ch === delim && !inQ) { cells.push(cur); cur = ''; }
       else cur += ch;
     }
     cells.push(cur);
-    rows.push(cells);
+    result.push(cells);
   }
-  return rows;
+  return result;
 }
 
-function isNumeric(val) { return val.trim() !== '' && !isNaN(Number(val.replace(/[$,%]/g,''))); }
+function isNum(v) { return v !== undefined && v.trim() !== '' && !isNaN(Number(v.replace(/[$,%]/g, ''))); }
 
-function parseInput() {
-  const text = document.getElementById('csv-input').value.trim();
-  if (!text) return;
-  renderCSV(text);
-}
+function render() {
+  numericCols = headers.map((_, ci) => rows.every(r => isNum(r[ci] ?? '')));
+  const grid = document.getElementById('grid-container');
+  grid.innerHTML = '';
+  const table = document.createElement('table');
+  table.id = 'grid';
 
-function renderCSV(text) {
-  const delimSel = document.getElementById('delimiter-select').value;
-  const delim = delimSel === 'auto' ? detectDelimiter(text) : delimSel;
-  const rows = parseCSV(text, delim);
-  if (rows.length < 2) { alert('Could not parse — need at least a header row and one data row.'); return; }
-  headers = rows[0];
-  allRows = rows.slice(1).filter(r => r.some(c => c.trim()));
-  sortCol = -1; sortDir = 1; currentPage = 1;
-  document.getElementById('controls').style.display = 'flex';
-  document.getElementById('table-wrap').style.display = 'block';
-  document.getElementById('clear-btn').style.display = '';
-  document.getElementById('copy-btn').style.display = '';
-  document.getElementById('search').value = '';
-  applyFilters();
-}
-
-function applyFilters() {
-  const q = document.getElementById('search').value.toLowerCase();
-  filteredRows = q ? allRows.filter(r => r.some(c => c.toLowerCase().includes(q))) : allRows.slice();
-  if (sortCol >= 0) {
-    const numeric = filteredRows.every(r => isNumeric(r[sortCol] || ''));
-    filteredRows.sort((a,b) => {
-      const va = a[sortCol]||'', vb = b[sortCol]||'';
-      return sortDir * (numeric ? Number(va.replace(/[$,%]/g,'')) - Number(vb.replace(/[$,%]/g,'')) : va.localeCompare(vb));
-    });
-  }
-  currentPage = 1;
-  renderTable();
-}
-
-function renderTable() {
-  const ps = document.getElementById('page-size').value;
-  const pageSize = ps === 'all' ? filteredRows.length : parseInt(ps);
-  const totalPages = Math.ceil(filteredRows.length / pageSize) || 1;
-  currentPage = Math.min(currentPage, totalPages);
-  const start = (currentPage - 1) * pageSize;
-  const pageRows = filteredRows.slice(start, start + pageSize);
-
-  document.getElementById('stats').textContent =
-    `${filteredRows.length.toLocaleString()} of ${allRows.length.toLocaleString()} rows · ${headers.length} columns`;
-
-  const numericCols = headers.map((_,ci) => allRows.every(r => isNumeric(r[ci]||'')));
-
-  let html = '<table><thead><tr>';
-  headers.forEach((h,i) => {
-    const cls = sortCol === i ? (sortDir === 1 ? 'asc' : 'desc') : '';
-    html += `<th class="${cls}" onclick="sortBy(${i})">${esc(h)}<span class="sort-icon"></span></th>`;
+  const thead = table.createTHead();
+  const hr = thead.insertRow();
+  const th0 = document.createElement('th');
+  th0.className = 'row-num-head';
+  th0.textContent = '#';
+  hr.appendChild(th0);
+  headers.forEach((h, ci) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    if (ci === sortCol) th.className = sortDir === 1 ? 'sorted-asc' : 'sorted-desc';
+    th.title = `${colLetter(ci)} — click to sort`;
+    th.onclick = () => { if (ci === sortCol) sortDir *= -1; else { sortCol = ci; sortDir = 1; } applySort(); render(); };
+    hr.appendChild(th);
   });
-  html += '</tr></thead><tbody>';
 
-  if (pageRows.length === 0) {
-    html += `<tr><td colspan="${headers.length}" class="empty-msg">No matching rows</td></tr>`;
-  } else {
-    for (const row of pageRows) {
-      html += '<tr>';
-      headers.forEach((_,ci) => {
-        const val = row[ci] !== undefined ? row[ci] : '';
-        html += `<td class="${numericCols[ci] ? 'num' : ''}">${esc(val)}</td>`;
-      });
-      html += '</tr>';
+  const tbody = table.createTBody();
+  rows.forEach((row, ri) => {
+    const tr = tbody.insertRow();
+    if (rowColors[ri]) tr.style.background = rowColors[ri];
+    const td0 = tr.insertCell();
+    td0.className = 'row-num';
+    td0.textContent = ri + 1;
+    headers.forEach((_, ci) => {
+      const td = tr.insertCell();
+      const val = row[ci] !== undefined ? row[ci] : '';
+      td.textContent = val;
+      if (numericCols[ci]) td.classList.add('num-cell');
+      if (ri === selRow && ci === selCol) td.classList.add('selected');
+      td.title = val;
+      td.onclick = () => selectCell(ri, ci, td);
+      td.ondblclick = () => { if (editMode) startEdit(ri, ci, td); };
+      td.onkeydown = (e) => { if (editMode && e.key === 'F2') startEdit(ri, ci, td); };
+    });
+  });
+
+  grid.appendChild(table);
+  updateStatus();
+}
+
+function selectCell(ri, ci, td) {
+  selRow = ri; selCol = ci;
+  document.querySelectorAll('td.selected').forEach(e => e.classList.remove('selected'));
+  td.classList.add('selected');
+  document.getElementById('cell-ref').textContent = colLetter(ci) + (ri + 1);
+  const val = rows[ri][ci] ?? '';
+  const fi = document.getElementById('formula-input');
+  fi.value = val;
+  fi.readOnly = !editMode;
+
+  const sel = rows[ri].filter((_, c) => numericCols[c]).map(v => Number(v.replace(/[$,%]/g, ''))).filter(v => !isNaN(v));
+  const rowNums = rows[ri].filter(v => isNum(v)).map(v => Number(v.replace(/[$,%]/g, '')));
+  document.getElementById('st-cell').textContent = `Cell: ${val.slice(0, 30)}${val.length > 30 ? '…' : ''}`;
+  if (isNum(val)) document.getElementById('st-sum').textContent = `Value: ${val}`;
+  else document.getElementById('st-sum').textContent = `Chars: ${val.length}`;
+}
+
+function startEdit(ri, ci, td) {
+  if (!editMode) return;
+  const val = rows[ri][ci] ?? '';
+  td.classList.add('edit-cell');
+  td.textContent = '';
+  const inp = document.createElement('input');
+  inp.value = val;
+  inp.setAttribute('lang', 'ko');
+  inp.style.imeMode = 'active';
+  td.appendChild(inp);
+  inp.focus();
+  inp.select();
+
+  const fi = document.getElementById('formula-input');
+  fi.readOnly = false;
+  fi.value = val;
+  fi.oninput = () => { inp.value = fi.value; };
+
+  function commit() {
+    const newVal = inp.value;
+    if (newVal !== val) {
+      undoStack.push({ ri, ci, old: val, nw: newVal });
+      document.getElementById('btn-undo').disabled = false;
+      rows[ri][ci] = newVal;
+      changes++;
+      updateChanges();
     }
+    td.classList.remove('edit-cell');
+    td.textContent = newVal;
+    if (numericCols[ci]) td.classList.add('num-cell');
+    fi.readOnly = true;
+    fi.oninput = null;
+    fi.value = newVal;
+    if (newVal !== val) td.classList.add('changed-cell');
   }
-  html += '</tbody></table>';
-  document.getElementById('table-wrap').innerHTML = html;
 
-  const pg = document.getElementById('pagination');
-  if (totalPages <= 1) { pg.style.display = 'none'; return; }
-  pg.style.display = 'flex';
-  pg.innerHTML = `
-    <button onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>
-    <button onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>
-    <span id="page-info">Page ${currentPage} of ${totalPages}</span>
-    <button onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>
-    <button onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>
-  `;
+  inp.onblur = commit;
+  inp.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); if (ri + 1 < rows.length) { selectCell(ri+1, ci, getCell(ri+1, ci)); startEdit(ri+1, ci, getCell(ri+1, ci)); } }
+    if (e.key === 'Tab') { e.preventDefault(); commit(); const nc = ci + (e.shiftKey ? -1 : 1); if (nc >= 0 && nc < headers.length) { selectCell(ri, nc, getCell(ri, nc)); startEdit(ri, nc, getCell(ri, nc)); } }
+    if (e.key === 'Escape') { inp.value = val; commit(); }
+  };
 }
 
-function sortBy(col) {
-  if (sortCol === col) sortDir *= -1;
-  else { sortCol = col; sortDir = 1; }
-  applyFilters();
+function getCell(ri, ci) {
+  const tbody = document.querySelector('#grid tbody');
+  if (!tbody) return null;
+  const tr = tbody.rows[ri];
+  return tr ? tr.cells[ci + 1] : null;
 }
 
-function goPage(p) { currentPage = p; renderTable(); }
+function applySort() {
+  if (sortCol < 0) return;
+  const num = numericCols[sortCol];
+  rows.sort((a, b) => {
+    const va = a[sortCol] ?? '', vb = b[sortCol] ?? '';
+    return sortDir * (num ? Number(va.replace(/[$,%]/g,'')) - Number(vb.replace(/[$,%]/g,'')) : va.localeCompare(vb, undefined, { sensitivity: 'base' }));
+  });
+  rowColors = {};
+}
+
+function toggleEditMode() {
+  editMode = !editMode;
+  const btn = document.getElementById('btn-edit');
+  btn.textContent = editMode ? 'View mode' : 'Edit mode';
+  btn.style.background = editMode ? 'rgba(255,200,0,0.3)' : '';
+  document.getElementById('btn-addrow').style.display = editMode ? '' : 'none';
+  document.getElementById('btn-addcol').style.display = editMode ? '' : 'none';
+  document.getElementById('btn-delrow').style.display = editMode ? '' : 'none';
+  document.getElementById('btn-undo').style.display = editMode ? '' : 'none';
+  document.getElementById('edit-toolbar').style.display = editMode ? 'flex' : 'none';
+  document.getElementById('formula-input').readOnly = !editMode;
+  document.getElementById('formula-input').placeholder = editMode ? 'Edit cell value here or double-click a cell' : 'Select a cell to view';
+}
+
+function addRow() {
+  undoStack.push({ type: 'addrow', ri: rows.length });
+  rows.push(new Array(headers.length).fill(''));
+  render();
+}
+
+function addCol() {
+  const name = prompt('Column name:');
+  if (!name) return;
+  undoStack.push({ type: 'addcol' });
+  headers.push(name);
+  rows.forEach(r => r.push(''));
+  render();
+}
+
+function delRow() {
+  if (selRow < 0 || selRow >= rows.length) { alert('Select a row first.'); return; }
+  undoStack.push({ type: 'delrow', ri: selRow, data: rows[selRow].slice() });
+  rows.splice(selRow, 1);
+  selRow = -1; selCol = -1;
+  render();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  const op = undoStack.pop();
+  if (op.type === 'addrow') rows.splice(op.ri, 1);
+  else if (op.type === 'addcol') { headers.pop(); rows.forEach(r => r.pop()); }
+  else if (op.type === 'delrow') rows.splice(op.ri, 0, op.data);
+  else { rows[op.ri][op.ci] = op.old; changes = Math.max(0, changes - 1); updateChanges(); }
+  document.getElementById('btn-undo').disabled = undoStack.length === 0;
+  render();
+}
+
+function colorRow() {
+  if (selRow < 0) return;
+  rowColors[selRow] = document.getElementById('row-color').value;
+  render();
+}
+
+function clearRowColor() {
+  if (selRow < 0) return;
+  delete rowColors[selRow];
+  render();
+}
+
+function updateStatus() {
+  document.getElementById('st-rows').textContent = `${rows.length.toLocaleString()} rows`;
+  document.getElementById('st-cols').textContent = `${headers.length} columns`;
+  updateChanges();
+}
+
+function updateChanges() {
+  document.getElementById('st-changes').textContent = changes > 0 ? `${changes} unsaved change${changes > 1 ? 's' : ''}` : '';
+}
+
+function toggleSearch() {
+  searchActive = !searchActive;
+  const bar = document.getElementById('search-bar');
+  bar.style.display = searchActive ? 'flex' : 'none';
+  if (searchActive) document.getElementById('search-input').focus();
+  else { document.getElementById('search-input').value = ''; clearHighlights(); }
+}
+
+function doSearch() {
+  clearHighlights();
+  const q = document.getElementById('search-input').value.toLowerCase();
+  if (!q) { document.getElementById('search-hits').textContent = ''; return; }
+  let count = 0;
+  document.querySelectorAll('#grid tbody td:not(.row-num)').forEach(td => {
+    if (td.textContent.toLowerCase().includes(q)) { td.style.background = '#fff59d'; count++; }
+  });
+  document.getElementById('search-hits').textContent = `${count} match${count !== 1 ? 'es' : ''}`;
+}
+
+function clearHighlights() {
+  document.querySelectorAll('#grid tbody td').forEach(td => { if (!td.classList.contains('selected') && !td.classList.contains('changed-cell')) td.style.background = ''; });
+}
+
+function csvEscape(val) {
+  if (val.includes(',') || val.includes('"') || val.includes('\n')) return `"${val.replace(/"/g, '""')}"`;
+  return val;
+}
+
+function downloadCSV() {
+  const enc = document.getElementById('enc-sel').value;
+  const lines = [headers.map(csvEscape).join(','), ...rows.map(r => (r.map ? r : Array.from(r)).map(csvEscape).join(','))];
+  const text = lines.join('\r\n');
+  let blob;
+  if (enc === 'UTF-8') blob = new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' });
+  else blob = new Blob([text], { type: 'text/csv;charset=' + enc });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'export.csv'; a.click();
+}
+
+function loadText(text) {
+  const delimSel = document.getElementById('delim-sel').value;
+  const delim = delimSel === 'auto' ? detectDelim(text) : delimSel;
+  const parsed = parseCSV(text, delim);
+  if (parsed.length < 2) { alert('Need at least a header row and one data row.'); return; }
+  headers = parsed[0]; rows = parsed.slice(1).filter(r => r.some(c => c.trim()));
+  sortCol = -1; sortDir = 1; selRow = -1; selCol = -1; undoStack = []; changes = 0; rowColors = {};
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('paste-area').style.display = 'none';
+  document.getElementById('btn-save').disabled = false;
+  document.getElementById('btn-edit').disabled = false;
+  document.getElementById('btn-search').disabled = false;
+  render();
+}
 
 function handleFile(e) {
   const file = e.target.files[0]; if (!file) return;
+  const enc = document.getElementById('enc-sel').value;
   const reader = new FileReader();
-  reader.onload = ev => { document.getElementById('csv-input').value = ev.target.result; renderCSV(ev.target.result.trim()); };
-  reader.readAsText(file);
+  reader.onload = ev => { document.getElementById('csv-paste').value = ev.target.result; loadText(ev.target.result.trim()); };
+  reader.readAsText(file, enc);
 }
 
-function handleDrag(e, over) {
-  e.preventDefault();
-  document.getElementById('drop-zone').classList.toggle('drag-over', over);
-}
-
-function handleDrop(e) {
-  e.preventDefault();
-  document.getElementById('drop-zone').classList.remove('drag-over');
-  const file = e.dataTransfer.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => { document.getElementById('csv-input').value = ev.target.result; renderCSV(ev.target.result.trim()); };
-  reader.readAsText(file);
-}
+function parsePaste() { const t = document.getElementById('csv-paste').value.trim(); if (t) loadText(t); }
 
 function clearAll() {
-  allRows = []; headers = []; filteredRows = [];
-  document.getElementById('csv-input').value = '';
-  document.getElementById('controls').style.display = 'none';
-  document.getElementById('table-wrap').style.display = 'none';
-  document.getElementById('pagination').style.display = 'none';
-  document.getElementById('clear-btn').style.display = 'none';
-  document.getElementById('copy-btn').style.display = 'none';
+  headers = []; rows = []; editMode = false; undoStack = []; changes = 0; rowColors = [];
+  document.getElementById('grid-container').innerHTML = '';
+  document.getElementById('grid-container').appendChild(Object.assign(document.createElement('div'), { id: 'drop-zone', onclick: () => document.getElementById('file-in').click() }));
+  document.getElementById('drop-zone').innerHTML = '<strong>Drop a CSV file here</strong><p>Supports UTF-8, EUC-KR, Korean, Japanese, Chinese, Arabic…</p><p>or paste CSV text below and click Parse</p>';
+  document.getElementById('drop-zone').ondragover = e => handleDrag(e, true);
+  document.getElementById('drop-zone').ondragleave = e => handleDrag(e, false);
+  document.getElementById('drop-zone').ondrop = handleDrop;
+  const pa = Object.assign(document.createElement('div'), { id: 'paste-area' });
+  pa.innerHTML = '<textarea id="csv-paste" style="flex:1;height:80px;font-size:12px;font-family:monospace;border:1px solid #c6c6c6;border-radius:3px;padding:8px;resize:vertical;" placeholder="Paste CSV text here…"></textarea><div id="paste-controls" style="display:flex;flex-direction:column;gap:6px;"><button onclick="parsePaste()" style="font-size:12px;padding:5px 10px;">Parse</button><button onclick="clearAll()" style="font-size:12px;padding:5px 10px;">Clear</button></div>';
+  document.getElementById('grid-container').appendChild(pa);
+  document.getElementById('btn-save').disabled = true;
+  document.getElementById('btn-edit').disabled = true;
+  document.getElementById('btn-search').disabled = true;
+  document.getElementById('btn-edit').textContent = 'Edit mode';
+  document.getElementById('edit-toolbar').style.display = 'none';
+  document.getElementById('search-bar').style.display = 'none';
+  document.getElementById('st-rows').textContent = 'No data';
+  document.getElementById('st-cols').textContent = '';
+  document.getElementById('st-cell').textContent = '';
+  document.getElementById('st-sum').textContent = '';
+  document.getElementById('st-changes').textContent = '';
+  document.getElementById('cell-ref').textContent = '—';
+  document.getElementById('formula-input').value = '';
 }
 
-function copyFiltered() {
-  const lines = [headers.join(','), ...filteredRows.map(r => r.map(c => c.includes(',') ? `"${c}"` : c).join(','))];
-  navigator.clipboard.writeText(lines.join('\n')).then(() => {
-    const btn = document.getElementById('copy-btn');
-    const orig = btn.textContent; btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = orig, 1500);
-  });
+function handleDrag(e, over) { e.preventDefault(); document.getElementById('drop-zone').classList.toggle('drag-over', over); }
+function handleDrop(e) {
+  e.preventDefault(); document.getElementById('drop-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0]; if (!file) return;
+  const enc = document.getElementById('enc-sel').value;
+  const reader = new FileReader();
+  reader.onload = ev => loadText(ev.target.result.trim());
+  reader.readAsText(file, enc);
 }
 
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+document.getElementById('formula-input').onchange = function() {
+  if (!editMode || selRow < 0 || selCol < 0) return;
+  const val = this.value;
+  undoStack.push({ ri: selRow, ci: selCol, old: rows[selRow][selCol], nw: val });
+  rows[selRow][selCol] = val;
+  changes++; updateChanges();
+  const td = getCell(selRow, selCol);
+  if (td) { td.textContent = val; td.classList.add('changed-cell'); }
+  document.getElementById('btn-undo').disabled = false;
+};
 </script>
