@@ -1,0 +1,259 @@
+
+<style>
+  #csv-wrap { padding: 1rem 0; font-size: 14px; }
+  #drop-zone {
+    border: 1.5px dashed var(--color-border-secondary);
+    border-radius: var(--border-radius-lg);
+    padding: 2rem;
+    text-align: center;
+    background: var(--color-background-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  #drop-zone.drag-over { border-color: #378ADD; background: var(--color-background-primary); }
+  #drop-zone p { margin: 0.4rem 0; color: var(--color-text-secondary); font-size: 13px; }
+  #drop-zone strong { color: var(--color-text-primary); font-size: 15px; }
+  #csv-input { width: 100%; height: 120px; margin-top: 1rem; font-family: var(--font-mono); font-size: 12px;
+    border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md);
+    padding: 10px; background: var(--color-background-primary); color: var(--color-text-primary); resize: vertical; }
+  #controls { display: flex; align-items: center; gap: 10px; margin: 0.75rem 0; flex-wrap: wrap; }
+  #search { flex: 1; min-width: 160px; }
+  #stats { font-size: 12px; color: var(--color-text-secondary); margin-left: auto; white-space: nowrap; }
+  #table-wrap { overflow-x: auto; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { position: sticky; top: 0; z-index: 1; }
+  th {
+    background: var(--color-background-secondary);
+    padding: 9px 12px; text-align: left; font-weight: 500;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    white-space: nowrap; cursor: pointer; user-select: none;
+    color: var(--color-text-secondary);
+  }
+  th:hover { color: var(--color-text-primary); }
+  th .sort-icon { font-size: 10px; margin-left: 4px; opacity: 0.5; }
+  th.asc .sort-icon::after { content: '▲'; opacity: 1; }
+  th.desc .sort-icon::after { content: '▼'; opacity: 1; }
+  th:not(.asc):not(.desc) .sort-icon::after { content: '⬍'; }
+  td { padding: 8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); color: var(--color-text-primary); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--color-background-secondary); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--color-text-secondary); }
+  #pagination { display: flex; align-items: center; gap: 8px; margin-top: 0.75rem; font-size: 13px; flex-wrap: wrap; }
+  #pagination button { padding: 4px 10px; }
+  #page-info { color: var(--color-text-secondary); font-size: 12px; }
+  .empty-msg { text-align: center; padding: 2rem; color: var(--color-text-secondary); }
+  #delimiter-select { font-size: 13px; }
+</style>
+
+<div id="csv-wrap">
+  <h2 class="sr-only">CSV file viewer — paste or upload CSV data to explore it as a table</h2>
+
+  <div id="drop-zone" onclick="document.getElementById('file-input').click()" ondragover="handleDrag(event,true)" ondragleave="handleDrag(event,false)" ondrop="handleDrop(event)">
+    <strong>Drop a CSV file here</strong>
+    <p>or click to browse — or paste data below</p>
+    <input type="file" id="file-input" accept=".csv,.tsv,.txt" style="display:none" onchange="handleFile(event)">
+  </div>
+
+  <textarea id="csv-input" placeholder="…or paste CSV text here and click Parse"></textarea>
+
+  <div style="display:flex;gap:8px;margin:0.5rem 0;align-items:center;">
+    <label style="font-size:13px;color:var(--color-text-secondary);">Delimiter:</label>
+    <select id="delimiter-select">
+      <option value="auto">Auto-detect</option>
+      <option value=",">Comma (,)</option>
+      <option value="	">Tab (\t)</option>
+      <option value=";">Semicolon (;)</option>
+      <option value="|">Pipe (|)</option>
+    </select>
+    <button onclick="parseInput()" style="margin-left:auto;">Parse ↗</button>
+    <button id="clear-btn" onclick="clearAll()" style="display:none;">Clear</button>
+    <button id="copy-btn" onclick="copyFiltered()" style="display:none;">Copy filtered</button>
+  </div>
+
+  <div id="controls" style="display:none;">
+    <input type="search" id="search" placeholder="Search all columns…" oninput="applyFilters()">
+    <label style="font-size:13px;color:var(--color-text-secondary);">Rows/page:</label>
+    <select id="page-size" onchange="applyFilters()">
+      <option value="20">20</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+      <option value="all">All</option>
+    </select>
+    <span id="stats"></span>
+  </div>
+
+  <div id="table-wrap" style="display:none;max-height:480px;overflow-y:auto;"></div>
+  <div id="pagination" style="display:none;"></div>
+</div>
+
+<script>
+let allRows = [], headers = [], sortCol = -1, sortDir = 1, currentPage = 1, filteredRows = [];
+
+function detectDelimiter(text) {
+  const line = text.split('\n')[0];
+  const counts = {',': 0, '\t': 0, ';': 0, '|': 0};
+  let inQ = false;
+  for (const ch of line) {
+    if (ch === '"') inQ = !inQ;
+    if (!inQ && counts[ch] !== undefined) counts[ch]++;
+  }
+  return Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+}
+
+function parseCSV(text, delim) {
+  const rows = [], lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cells = [], d = delim;
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === d && !inQ) { cells.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    cells.push(cur);
+    rows.push(cells);
+  }
+  return rows;
+}
+
+function isNumeric(val) { return val.trim() !== '' && !isNaN(Number(val.replace(/[$,%]/g,''))); }
+
+function parseInput() {
+  const text = document.getElementById('csv-input').value.trim();
+  if (!text) return;
+  renderCSV(text);
+}
+
+function renderCSV(text) {
+  const delimSel = document.getElementById('delimiter-select').value;
+  const delim = delimSel === 'auto' ? detectDelimiter(text) : delimSel;
+  const rows = parseCSV(text, delim);
+  if (rows.length < 2) { alert('Could not parse — need at least a header row and one data row.'); return; }
+  headers = rows[0];
+  allRows = rows.slice(1).filter(r => r.some(c => c.trim()));
+  sortCol = -1; sortDir = 1; currentPage = 1;
+  document.getElementById('controls').style.display = 'flex';
+  document.getElementById('table-wrap').style.display = 'block';
+  document.getElementById('clear-btn').style.display = '';
+  document.getElementById('copy-btn').style.display = '';
+  document.getElementById('search').value = '';
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('search').value.toLowerCase();
+  filteredRows = q ? allRows.filter(r => r.some(c => c.toLowerCase().includes(q))) : allRows.slice();
+  if (sortCol >= 0) {
+    const numeric = filteredRows.every(r => isNumeric(r[sortCol] || ''));
+    filteredRows.sort((a,b) => {
+      const va = a[sortCol]||'', vb = b[sortCol]||'';
+      return sortDir * (numeric ? Number(va.replace(/[$,%]/g,'')) - Number(vb.replace(/[$,%]/g,'')) : va.localeCompare(vb));
+    });
+  }
+  currentPage = 1;
+  renderTable();
+}
+
+function renderTable() {
+  const ps = document.getElementById('page-size').value;
+  const pageSize = ps === 'all' ? filteredRows.length : parseInt(ps);
+  const totalPages = Math.ceil(filteredRows.length / pageSize) || 1;
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage - 1) * pageSize;
+  const pageRows = filteredRows.slice(start, start + pageSize);
+
+  document.getElementById('stats').textContent =
+    `${filteredRows.length.toLocaleString()} of ${allRows.length.toLocaleString()} rows · ${headers.length} columns`;
+
+  const numericCols = headers.map((_,ci) => allRows.every(r => isNumeric(r[ci]||'')));
+
+  let html = '<table><thead><tr>';
+  headers.forEach((h,i) => {
+    const cls = sortCol === i ? (sortDir === 1 ? 'asc' : 'desc') : '';
+    html += `<th class="${cls}" onclick="sortBy(${i})">${esc(h)}<span class="sort-icon"></span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  if (pageRows.length === 0) {
+    html += `<tr><td colspan="${headers.length}" class="empty-msg">No matching rows</td></tr>`;
+  } else {
+    for (const row of pageRows) {
+      html += '<tr>';
+      headers.forEach((_,ci) => {
+        const val = row[ci] !== undefined ? row[ci] : '';
+        html += `<td class="${numericCols[ci] ? 'num' : ''}">${esc(val)}</td>`;
+      });
+      html += '</tr>';
+    }
+  }
+  html += '</tbody></table>';
+  document.getElementById('table-wrap').innerHTML = html;
+
+  const pg = document.getElementById('pagination');
+  if (totalPages <= 1) { pg.style.display = 'none'; return; }
+  pg.style.display = 'flex';
+  pg.innerHTML = `
+    <button onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>
+    <button onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>
+    <span id="page-info">Page ${currentPage} of ${totalPages}</span>
+    <button onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>
+    <button onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>
+  `;
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  applyFilters();
+}
+
+function goPage(p) { currentPage = p; renderTable(); }
+
+function handleFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { document.getElementById('csv-input').value = ev.target.result; renderCSV(ev.target.result.trim()); };
+  reader.readAsText(file);
+}
+
+function handleDrag(e, over) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.toggle('drag-over', over);
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { document.getElementById('csv-input').value = ev.target.result; renderCSV(ev.target.result.trim()); };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  allRows = []; headers = []; filteredRows = [];
+  document.getElementById('csv-input').value = '';
+  document.getElementById('controls').style.display = 'none';
+  document.getElementById('table-wrap').style.display = 'none';
+  document.getElementById('pagination').style.display = 'none';
+  document.getElementById('clear-btn').style.display = 'none';
+  document.getElementById('copy-btn').style.display = 'none';
+}
+
+function copyFiltered() {
+  const lines = [headers.join(','), ...filteredRows.map(r => r.map(c => c.includes(',') ? `"${c}"` : c).join(','))];
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const orig = btn.textContent; btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
